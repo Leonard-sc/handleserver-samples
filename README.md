@@ -1,2 +1,2 @@
 # handleserver-samples
-Various samples of how to use the Handle.net Registry
+This repository contains various samples of how to use the [Handle.net Registry](https://www.handle.net/index.html). The samples primarily focus on using the handle server REST API in other languages (i.e. not Java or JavaScript).
