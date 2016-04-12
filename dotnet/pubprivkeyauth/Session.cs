@@ -1,6 +1,8 @@
 ﻿using Newtonsoft.Json.Linq;
-using OpenSSL.Crypto;
 using Org.BouncyCastle.Asn1;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Crypto.Signers;
+using Org.BouncyCastle.OpenSsl;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -20,7 +22,7 @@ namespace pubprivkeyauth
             string pathToPrivateKeyPemFile = @"path_to_private_key";
             string adminId = "admin_handle";
             string prefix = "prefix_to_work_with";
-            string ip = "primary_server_ip";
+            string ip = "primary_handle_server";
             int port = 8000;
 
             var sessionId = await SetupSession(pathToPrivateKeyPemFile, adminId, ip, port);
@@ -30,9 +32,9 @@ namespace pubprivkeyauth
                 // Update an existing handle
                 await UpdateHandleRecord(prefix + "/1", sessionId, ip, port);
                 // Create a new handle
-                await CreateHandleRecord(prefix + "/2", sessionId, adminId, ip, port);
+                await CreateHandleRecord(prefix + "/3", sessionId, adminId, ip, port);
                 // Delete a handle
-                await DeleteHandleRecord(prefix + "/2", sessionId, ip, port);
+                await DeleteHandleRecord(prefix + "/3", sessionId, ip, port);
             }
             else
             {
@@ -243,27 +245,50 @@ namespace pubprivkeyauth
             return authorizationHeaderString;
         }
 
-        private byte[] SignBytesDsa(byte[] byteArray, string pathToPrivateKeyPemFile) {
-            // Use this method for DSA keys
-            string key = System.IO.File.ReadAllText(pathToPrivateKeyPemFile);
+        private byte[] SignBytesRsa(byte[] byteArray, string pathToPrivateKeyPemFile)
+        {
+            // TODO if/when we have an RSA key - Steps are 
 
-            // Import the key
-            CryptoKey d = CryptoKey.FromPrivateKey(key, null);
-            var dsaKey = d.GetDSA();
+            // Import RSA key
 
+            // Create PKCS1 (v1.5) signer
+
+            // Create SHA256 digest of byte array
+
+            // Sign digest
+
+            throw new NotImplementedException();
+        }
+
+        private byte[] SignBytesDsa(byte[] byteArray, string pathToPrivateKeyPemFile)
+        {
             // Create a digest of nonce + cnonce
             // This only seems to work with SHA1 (SHA256 gives us a 401 error)
             var sha = SHA1.Create();
             var digest = sha.ComputeHash(byteArray);
 
+            // Read DSA key
+            DsaKeyParameters keyParameters;
+            using (var fileStream = System.IO.File.OpenText(pathToPrivateKeyPemFile))
+            {
+                var pemReader = new PemReader(fileStream);
+                keyParameters = (DsaKeyParameters)pemReader.ReadObject();
+            }
+
+            // Create DSA signer
+            DsaSigner sig = new DsaSigner();
+            sig.Init(true, keyParameters);
+
             // Digitally sign the digest with our private key
             // The corresponding public key is in our admin handle on the server
-            var sig = dsaKey.Sign(digest);
+            var signature = sig.GenerateSignature(digest);
 
             // Signature bytes from a DSA key need to be DER-encoded
             // This signature is in two parts (r and s)
-            Asn1InputStream bIn = new Asn1InputStream(new MemoryStream(sig));
-            DerSequence seq = bIn.ReadObject() as DerSequence;
+            DerSequence seq = new DerSequence(new Asn1Encodable[2] { new DerInteger(signature[0]), new DerInteger(signature[1]) });
+            var encode = seq.GetEncoded();
+            var derEncode = seq.GetDerEncoded();
+
 
             return seq.GetDerEncoded();
         }
